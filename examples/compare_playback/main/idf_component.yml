@@ -1,0 +1,5 @@
+## IDF Component Manager Manifest File
+dependencies:
+  esp_elastic_pcm_buffer:
+    path: ../../..
+  espressif/esp32_s3_korvo_2: ^4.1.2

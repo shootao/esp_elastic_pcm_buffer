@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS
+        "src/elastic_pcm_buffer.c"
+        "src/audio_speed_control.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_INCLUDE_DIRS
+        "priv_include"
+    REQUIRES
+        esp_psram
+        esp_timer
+)

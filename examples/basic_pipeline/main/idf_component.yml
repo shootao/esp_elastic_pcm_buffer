@@ -1,0 +1,4 @@
+## IDF Component Manager Manifest File
+dependencies:
+  esp_elastic_pcm_buffer:
+    path: ../../..
