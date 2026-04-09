@@ -76,7 +76,6 @@ void app_main(void)
         .bits_per_sample = DEMO_BITS_PER_SAMPLE,
         .consumer_task_stack_size = 4096,
         .consumer_task_priority = 5,
-        .consumer_idle_ms = 5,
         .output_cb = demo_output_cb,
         .output_ctx = &stats,
     };

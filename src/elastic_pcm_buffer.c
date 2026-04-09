@@ -211,6 +211,23 @@ static void elastic_pcm_buffer_emit_event(elastic_pcm_buffer_t *jb, elastic_pcm_
     }
 }
 
+static void elastic_pcm_buffer_notify_consumer(elastic_pcm_buffer_t *jb)
+{
+    TaskHandle_t consumer_task = NULL;
+
+    if (jb == NULL) {
+        return;
+    }
+
+    xSemaphoreTake(jb->lock, portMAX_DELAY);
+    consumer_task = jb->consumer_task;
+    xSemaphoreGive(jb->lock);
+
+    if (consumer_task != NULL) {
+        xTaskNotifyGive(consumer_task);
+    }
+}
+
 static bool elastic_pcm_buffer_can_consume_locked(elastic_pcm_buffer_t *jb)
 {
     if (jb->prefill_mode) {
@@ -298,9 +315,9 @@ static void elastic_pcm_buffer_consumer_task(void *arg)
         elastic_pcm_buffer_frame_meta_t meta = {0};
         size_t produced_size = 0;
         float recommended_speed = 1.0f;
-        uint32_t idle_ms = 5;
         bool have_frame = false;
         bool drain_direct = false;
+        bool wait_for_signal = false;
         esp_err_t err = ESP_OK;
 
         xSemaphoreTake(jb->lock, portMAX_DELAY);
@@ -312,7 +329,6 @@ static void elastic_pcm_buffer_consumer_task(void *arg)
 
         output_cb = jb->pipeline_cfg.output_cb;
         output_ctx = jb->pipeline_cfg.output_ctx;
-        idle_ms = jb->pipeline_cfg.consumer_idle_ms ? jb->pipeline_cfg.consumer_idle_ms : 5;
 
         if (jb->stop_requested) {
             if (jb->stop_mode == ELASTIC_PCM_BUFFER_STOP_MODE_DISCARD) {
@@ -320,7 +336,6 @@ static void elastic_pcm_buffer_consumer_task(void *arg)
                 jb->stop_requested = false;
                 xSemaphoreGive(jb->lock);
                 audio_speed_control_reset(&jb->speed_ctrl);
-                vTaskDelay(pdMS_TO_TICKS(idle_ms));
                 continue;
             }
 
@@ -337,8 +352,7 @@ static void elastic_pcm_buffer_consumer_task(void *arg)
 
             if (!have_frame) {
                 audio_speed_control_reset(&jb->speed_ctrl);
-                vTaskDelay(pdMS_TO_TICKS(idle_ms));
-                continue;
+                wait_for_signal = true;
             }
         } else {
             if (elastic_pcm_buffer_can_consume_locked(jb)) {
@@ -359,18 +373,24 @@ static void elastic_pcm_buffer_consumer_task(void *arg)
                 } else {
                     xSemaphoreGive(jb->lock);
                 }
-                vTaskDelay(pdMS_TO_TICKS(idle_ms));
-                continue;
+                wait_for_signal = true;
             }
 
-            xSemaphoreTake(jb->lock, portMAX_DELAY);
-            if (jb->consumer_starved_mark) {
-                jb->consumer_starved_mark = false;
-                xSemaphoreGive(jb->lock);
-                elastic_pcm_buffer_emit_event(jb, ELASTIC_PCM_BUFFER_EVENT_CONSUMER_RECOVERED);
-            } else {
-                xSemaphoreGive(jb->lock);
+            if (!wait_for_signal) {
+                xSemaphoreTake(jb->lock, portMAX_DELAY);
+                if (jb->consumer_starved_mark) {
+                    jb->consumer_starved_mark = false;
+                    xSemaphoreGive(jb->lock);
+                    elastic_pcm_buffer_emit_event(jb, ELASTIC_PCM_BUFFER_EVENT_CONSUMER_RECOVERED);
+                } else {
+                    xSemaphoreGive(jb->lock);
+                }
             }
+        }
+
+        if (wait_for_signal) {
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            continue;
         }
 
         if (drain_direct) {
@@ -386,7 +406,6 @@ static void elastic_pcm_buffer_consumer_task(void *arg)
         err = audio_speed_control_apply(&jb->speed_ctrl, recommended_speed);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "failed to apply sonic speed: %s", esp_err_to_name(err));
-            vTaskDelay(pdMS_TO_TICKS(idle_ms));
             continue;
         }
 
@@ -394,7 +413,6 @@ static void elastic_pcm_buffer_consumer_task(void *arg)
                                           jb->output_buffer, jb->output_buffer_size, &produced_size);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "failed to process sonic: %s", esp_err_to_name(err));
-            vTaskDelay(pdMS_TO_TICKS(idle_ms));
             continue;
         }
 
@@ -462,6 +480,7 @@ void elastic_pcm_buffer_destroy(elastic_pcm_buffer_t *jb)
         xSemaphoreTake(jb->lock, portMAX_DELAY);
         jb->task_exit_requested = true;
         xSemaphoreGive(jb->lock);
+        elastic_pcm_buffer_notify_consumer(jb);
 
         while (jb->consumer_task != NULL) {
             vTaskDelay(pdMS_TO_TICKS(10));
@@ -586,6 +605,7 @@ esp_err_t elastic_pcm_buffer_session_end(elastic_pcm_buffer_t *jb, elastic_pcm_b
     jb->stop_mode = mode;
     jb->stop_requested = true;
     xSemaphoreGive(jb->lock);
+    elastic_pcm_buffer_notify_consumer(jb);
     return ESP_OK;
 }
 
@@ -627,6 +647,7 @@ esp_err_t elastic_pcm_buffer_push(elastic_pcm_buffer_t *jb, const void *data, si
         jb->prefill_mode = false;
     }
     xSemaphoreGive(jb->lock);
+    elastic_pcm_buffer_notify_consumer(jb);
     return ESP_OK;
 }
 

@@ -2,6 +2,14 @@
 
 -------------------
 
+## v0.5.3
+
+### Changed
+
+- Pipeline consumer task no longer polls with a delay when no PCM frames are available. It now blocks on task notifications and wakes on `elastic_pcm_buffer_push()`, `elastic_pcm_buffer_session_end()`, and destroy/shutdown.
+- `elastic_pcm_buffer_pipeline_cfg_t::consumer_idle_ms` is now deprecated and ignored. It is kept only for backward source compatibility.
+- Example applications no longer set `consumer_idle_ms` in pipeline configuration.
+
 ## v0.5.2
 
 ### Changed

@@ -1,4 +1,4 @@
-version: "0.5.2"
+version: "0.5.3"
 description: An adaptive PCM audio renderer for ESP-IDF that stabilizes jittery network streams using dynamic time-stretching (Sonic).
 url: https://github.com/shootao/esp_elastic_pcm_buffer
 documentation: "https://github.com/shootao/esp_elastic_pcm_buffer/blob/main/README.md"

@@ -40,7 +40,7 @@ static const char *EXAMPLE_NAME = "compare_playback";
 #define PCM_CHUNK_MS                60
 #define PCM_FRAME_SAMPLES           ((PCM_SAMPLE_RATE * PCM_CHUNK_MS) / 1000)
 #define PCM_FRAME_BYTES             (PCM_FRAME_SAMPLES * PCM_CHANNELS * (PCM_BITS_PER_SAMPLE / 8))
-#define PCM_DEFAULT_FILE_PATH       BSP_SD_MOUNT_POINT "/jb.pcm"
+#define PCM_DEFAULT_FILE_PATH       BSP_SD_MOUNT_POINT "/feeder.pcm"
 
 #define NET_JITTER_DOWN_MS_MAX      60
 #define NET_JITTER_UP_MS_MAX        60
@@ -444,7 +444,6 @@ static esp_err_t run_elastic_playback(const char *file_path)
         .bits_per_sample = PCM_BITS_PER_SAMPLE,
         .consumer_task_stack_size = 6144,
         .consumer_task_priority = 5,
-        .consumer_idle_ms = 5,
         .output_cb = elastic_output_to_speaker_cb,
         .output_ctx = NULL,
     };

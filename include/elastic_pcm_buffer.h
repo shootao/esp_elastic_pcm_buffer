@@ -13,6 +13,12 @@
 
 #include "esp_err.h"
 
+#if defined(__GNUC__) || defined(__clang__)
+#define ELASTIC_PCM_BUFFER_DEPRECATED_FIELD(msg) __attribute__((deprecated(msg)))
+#else
+#define ELASTIC_PCM_BUFFER_DEPRECATED_FIELD(msg)
+#endif
+
 /**
  * @brief  Elastic PCM buffer internal state.
  *
@@ -190,7 +196,7 @@ typedef struct {
     uint8_t                         bits_per_sample;
     uint32_t                        consumer_task_stack_size;
     uint8_t                         consumer_task_priority;
-    uint32_t                        consumer_idle_ms;
+    uint32_t                        consumer_idle_ms ELASTIC_PCM_BUFFER_DEPRECATED_FIELD("ignored; consumer blocks on task notifications instead of polling");
     elastic_pcm_buffer_output_cb_t  output_cb;
     void                           *output_ctx;
 } elastic_pcm_buffer_pipeline_cfg_t;
